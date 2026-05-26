@@ -1,272 +1,423 @@
 # src/ui/main_window.py
 import os
 import sys
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QMessageBox, QProgressBar
+)
+from PyQt5.QtGui import QPixmap, QFont
+from PyQt5.QtCore import Qt, QTimer
 
-# 导入MapLabel
-from src.ui.map_controller import MapLabel
+# 导入地图控件
+from .map_controller import MapLabel
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
-        
+    
     def initUI(self):
-        # 设置窗口标题和大小
-        self.setWindowTitle('北航图寻')
-        self.setGeometry(100, 100, 1400, 800)  # 增大窗口
-
-        # 中央窗口部件
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-
-        # 主布局：左右分栏，设置比例
-        layout = QHBoxLayout(central_widget)
-        layout.setSpacing(20)  # 设置间距
-
-        # ============ 左侧：游戏控制区 ============
+        """初始化界面"""
+        self.setWindowTitle('北航图寻 v1.0')
+        self.setGeometry(100, 100, 1400, 800)
+        
+        # 中央部件
+        central = QWidget()
+        self.setCentralWidget(central)
+        
+        # 主布局
+        main_layout = QHBoxLayout(central)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # ============ 左侧：游戏区 ============
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         left_layout.setSpacing(15)
-
-        # 标题
-        title_label = QLabel("北航图寻")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #003366;")
-        left_layout.addWidget(title_label)
-
-        # 图片显示区域 - 增大尺寸
+        
+        # 1. 标题
+        title = QLabel("北航图寻")
+        title.setFont(QFont("Microsoft YaHei", 24, QFont.Bold))
+        title.setStyleSheet("color: #003366; padding: 10px;")
+        title.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(title)
+        
+        # 2. 游戏状态
+        self.status_label = QLabel("点击'开始游戏'开始")
+        self.status_label.setFont(QFont("Microsoft YaHei", 14))
+        self.status_label.setStyleSheet("""
+            QLabel {
+                padding: 10px;
+                background-color: #f8f9fa;
+                border: 2px solid #dee2e6;
+                border-radius: 8px;
+                color: #495057;
+            }
+        """)
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setMinimumHeight(60)
+        left_layout.addWidget(self.status_label)
+        
+        # 3. 地点图片
         self.image_label = QLabel()
-        self.image_label.setMinimumSize(500, 375)  # 增大：500×375 (4:3比例)
-        self.image_label.setMaximumSize(600, 450)  # 最大：600×450
+        self.image_label.setMinimumSize(500, 375)
+        self.image_label.setMaximumSize(600, 450)
         self.image_label.setStyleSheet("""
             QLabel {
                 border: 3px solid #ff6b6b;
+                border-radius: 8px;
                 background-color: white;
                 qproperty-alignment: AlignCenter;
             }
         """)
-
-        # 加载地点图片
-        self.load_location_image("main_building", 1)
-
         left_layout.addWidget(self.image_label)
-
-        # 图片说明
-        self.image_desc = QLabel("当前目标地点")
-        self.image_desc.setStyleSheet("font-size: 14px; color: #666;")
-        left_layout.addWidget(self.image_desc)
-
-        # 信息显示区域
-        self.info_label = QLabel("等待游戏开始...")
-        self.info_label.setStyleSheet("""
+        
+        # 4. 地点信息
+        self.location_label = QLabel("等待游戏开始...")
+        self.location_label.setFont(QFont("Microsoft YaHei", 12))
+        self.location_label.setStyleSheet("color: #6c757d;")
+        self.location_label.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(self.location_label)
+        
+        # 5. 提示
+        self.hint_label = QLabel("提示：")
+        self.hint_label.setFont(QFont("Microsoft YaHei", 11))
+        self.hint_label.setStyleSheet("""
             QLabel {
-                font-size: 16px;
-                padding: 10px;
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
+                padding: 8px;
+                background-color: #fff3cd;
+                border: 1px solid #ffeaa7;
                 border-radius: 5px;
+                color: #856404;
             }
         """)
-        self.info_label.setMinimumHeight(100)
-        left_layout.addWidget(self.info_label)
-
-        # 游戏控制按钮
+        self.hint_label.setWordWrap(True)
+        left_layout.addWidget(self.hint_label)
+        
+        # 6. 游戏进度
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 10)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("第 %v/%m 轮")
+        left_layout.addWidget(self.progress_bar)
+        
+        # 7. 得分
+        self.score_label = QLabel("得分: 0")
+        self.score_label.setFont(QFont("Microsoft YaHei", 18, QFont.Bold))
+        self.score_label.setStyleSheet("color: #dc3545;")
+        self.score_label.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(self.score_label)
+        
+        # 8. 控制按钮
         button_layout = QHBoxLayout()
-
-        start_button = QPushButton("开始游戏")
-        start_button.setStyleSheet("""
+        
+        self.start_btn = QPushButton("开始游戏")
+        self.start_btn.setFont(QFont("Microsoft YaHei", 12))
+        self.start_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
                 color: white;
-                padding: 10px 20px;
-                font-size: 16px;
-                border-radius: 5px;
+                padding: 12px 24px;
+                border-radius: 6px;
                 font-weight: bold;
             }
-            QPushButton:hover {
-                background-color: #218838;
-            }
+            QPushButton:hover { background-color: #218838; }
         """)
-
-        test_button = QPushButton("测试图片")
-        test_button.setStyleSheet("""
+        self.start_btn.clicked.connect(self.start_game)
+        
+        self.hint_btn = QPushButton("获取提示")
+        self.hint_btn.setFont(QFont("Microsoft YaHei", 11))
+        self.hint_btn.setStyleSheet("""
             QPushButton {
                 background-color: #17a2b8;
                 color: white;
-                padding: 8px 16px;
-                border-radius: 5px;
+                padding: 10px 20px;
+                border-radius: 6px;
             }
+            QPushButton:hover { background-color: #138496; }
+            QPushButton:disabled { background-color: #6c757d; }
         """)
-        test_button.clicked.connect(self.test_image_load)
-
-        reset_button = QPushButton("重置视图")
-        reset_button.setStyleSheet("""
+        self.hint_btn.clicked.connect(self.get_hint)
+        self.hint_btn.setEnabled(False)
+        
+        self.next_btn = QPushButton("下一轮")
+        self.next_btn.setFont(QFont("Microsoft YaHei", 11))
+        self.next_btn.setStyleSheet("""
             QPushButton {
-                background-color: #6c757d;
+                background-color: #007bff;
                 color: white;
-                padding: 8px 16px;
-                border-radius: 5px;
+                padding: 10px 20px;
+                border-radius: 6px;
             }
+            QPushButton:hover { background-color: #0056b3; }
+            QPushButton:disabled { background-color: #6c757d; }
         """)
-        reset_button.clicked.connect(lambda: self.map_label.reset_view())
-
-        button_layout.addWidget(start_button)
-        button_layout.addWidget(test_button)
-        button_layout.addWidget(reset_button)
-
+        self.next_btn.clicked.connect(self.next_round)
+        self.next_btn.setEnabled(False)
+        
+        self.end_btn = QPushButton("结束游戏")
+        self.end_btn.setFont(QFont("Microsoft YaHei", 11))
+        self.end_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 6px;
+            }
+            QPushButton:hover { background-color: #c82333; }
+            QPushButton:disabled { background-color: #6c757d; }
+        """)
+        self.end_btn.clicked.connect(self.end_game)
+        self.end_btn.setEnabled(False)
+        
+        button_layout.addWidget(self.start_btn)
+        button_layout.addWidget(self.hint_btn)
+        button_layout.addWidget(self.next_btn)
+        button_layout.addWidget(self.end_btn)
+        
         left_layout.addLayout(button_layout)
-
-        # 得分显示
-        self.score_label = QLabel("得分: 0")
-        self.score_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #dc3545;")
-        left_layout.addWidget(self.score_label)
-
         left_layout.addStretch()
-
-        # ============ 右侧：地图交互区 ============
+        
+        # ============ 右侧：地图区 ============
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-
+        right_layout.setSpacing(15)
+        
         # 地图标题
         map_title = QLabel("北航校园地图")
-        map_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #003366;")
+        map_title.setFont(QFont("Microsoft YaHei", 20, QFont.Bold))
+        map_title.setStyleSheet("color: #003366;")
+        map_title.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(map_title)
-
-        # 地图控件 - 增大但保持比例
+        
+        # 地图控件
         self.map_label = MapLabel()
-        self.map_label.setMinimumSize(700, 525)  # 700×525 (与左侧保持比例)
-
+        self.map_label.setMinimumSize(700, 525)
+        self.map_label.setStyleSheet("""
+            QLabel {
+                border: 3px solid #17a2b8;
+                border-radius: 8px;
+                background-color: white;
+            }
+        """)
+        
         # 加载地图
         map_path = "data/map.png"
         if os.path.exists(map_path):
             if not self.map_label.load_map(map_path):
-                print("地图加载失败")
+                self.show_error("地图加载失败", "无法加载地图文件")
         else:
             print(f"地图文件不存在: {map_path}")
-            self.map_label.setText(f"地图文件不存在\n{map_path}")
-
-        # 地图使用说明
-        map_instructions = QLabel("使用说明：\n• 鼠标滚轮缩放\n• 左键拖拽移动\n• 右键点击选择位置")
-        map_instructions.setStyleSheet("color: #666; font-size: 14px;")
-    
-        right_layout.addWidget(self.map_label)
-        right_layout.addWidget(map_instructions)
-        right_layout.addStretch()
-
-        # ============ 设置布局比例 ============
-        # 左侧:右侧 ≈ 5:7 (更平衡的比例)
-        layout.addWidget(left_panel, stretch=5)   # 左侧占5份
-        layout.addWidget(right_panel, stretch=7)  # 右侧占7份
-
-        # 连接信号
+            # 创建测试地图
+            self.map_label.create_test_map()
+        
+        # 连接地图点击信号
         self.map_label.mapClicked.connect(self.on_map_click)
-
-        print("✅ 界面初始化完成（优化布局）")
-
         
-    def load_location_image(self, location_name, image_index=0):
-        """加载指定地点的图片"""
-        print(f"\n=== 加载地点图片: {location_name}_{image_index} ===")
+        right_layout.addWidget(self.map_label)
         
-        # 构建图片路径
-        image_filename = f"{location_name}_{image_index}.jpg"
-        image_path = os.path.join("data", "images", image_filename)
+        # 操作说明
+        instructions = QLabel("""
+        🎮 操作说明：
+        • 鼠标滚轮：缩放地图
+        • 左键拖拽：移动地图
+        • 右键点击：选择位置进行猜测
+        • 开始游戏后，根据左侧图片在地图上找到对应位置
+        """)
+        instructions.setFont(QFont("Microsoft YaHei", 11))
+        instructions.setStyleSheet("""
+            QLabel {
+                padding: 10px;
+                background-color: #e7f5ff;
+                border: 1px solid #a5d8ff;
+                border-radius: 8px;
+                color: #1864ab;
+            }
+        """)
+        instructions.setWordWrap(True)
+        right_layout.addWidget(instructions)
         
-        # 如果指定文件不存在，尝试通用名称
-        if not os.path.exists(image_path):
-            image_path = "data/images/1.jpg"
+        # 坐标显示
+        self.coord_label = QLabel("坐标: (0, 0)")
+        self.coord_label.setFont(QFont("Microsoft YaHei", 10))
+        self.coord_label.setStyleSheet("color: #495057;")
+        self.coord_label.setAlignment(Qt.AlignCenter)
+        right_layout.addWidget(self.coord_label)
         
-        print(f"尝试加载: {image_path}")
-        print(f"文件存在: {os.path.exists(image_path)}")
+        right_layout.addStretch()
         
-        if os.path.exists(image_path):
-            pixmap = QPixmap(image_path)
-            if not pixmap.isNull():
-                # 缩放图片以适应标签
-                scaled_pixmap = pixmap.scaled(
-                    self.image_label.size(), 
-                    Qt.KeepAspectRatio, 
-                    Qt.SmoothTransformation
-                )
-                self.image_label.setPixmap(scaled_pixmap)
-                self.image_label.setAlignment(Qt.AlignCenter)
-                print(f"✅ 图片加载成功: {image_path}")
-                print(f"图片尺寸: {pixmap.size()} -> {scaled_pixmap.size()}")
-                return True
-            else:
-                print("❌ QPixmap加载失败，图片可能损坏")
-        else:
-            print("❌ 文件不存在")
-            
-        # 加载失败时使用测试图片
-        self.create_test_image()
-        return False
+        # ============ 设置布局比例 ============
+        main_layout.addWidget(left_panel, stretch=5)
+        main_layout.addWidget(right_panel, stretch=7)
         
-    def create_test_image(self):
-        """创建临时测试图片"""
-        from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont
+        # 初始化显示测试图片
+        self.load_actual_images_or_create_test()
         
-        print("⚠️ 使用生成的测试图片")
+        print("✅ 界面初始化完成")
+    
+    def load_actual_images_or_create_test(self):
+        """尝试加载实际图片，否则创建测试图片"""
+        actual_images = [
+            "data/images/天空之境.jpg",
+            "data/images/末秋午后.jpg", 
+            "data/images/湖上行者.jpg"
+        ]
         
-        # 创建400x300的图片
-        pixmap = QPixmap(400, 300)
-        pixmap.fill(QColor(240, 248, 255))  # 浅蓝色背景
+        for image_path in actual_images:
+            if os.path.exists(image_path):
+                pixmap = QPixmap(image_path)
+                if not pixmap.isNull():
+                    scaled_pixmap = pixmap.scaled(
+                        self.image_label.size(), 
+                        Qt.KeepAspectRatio, 
+                        Qt.SmoothTransformation
+                    )
+                    self.image_label.setPixmap(scaled_pixmap)
+                    print(f"✅ 成功加载: {image_path}")
+                    return
+        
+        # 如果所有图片都不存在，创建简单测试图片
+        print("❌ 未找到任何实际图片，使用测试图片")
+        self.create_simple_test_image()
+    
+    def create_simple_test_image(self):
+        """创建简单的测试图片"""
+        from PyQt5.QtGui import QPixmap, QPainter, QColor
+        
+        pixmap = QPixmap(500, 375)
+        pixmap.fill(QColor(240, 248, 255))
         
         painter = QPainter(pixmap)
+        painter.setPen(QColor(255, 0, 0))
+        painter.drawRect(0, 0, 499, 374)
         
-        # 画边框
-        painter.setPen(QColor(255, 0, 0))  # 红色边框
-        painter.drawRect(0, 0, 399, 299)
-        
-        # 写文字
         painter.setFont(QFont("Arial", 16, QFont.Bold))
-        painter.setPen(QColor(25, 25, 112))  # 深蓝色文字
-        painter.drawText(pixmap.rect(), Qt.AlignCenter, "北航图寻\n地点图片\n400×300")
-        
-        # 画一个简单的建筑图标
-        painter.setBrush(QColor(139, 0, 0))  # 深红色
-        painter.drawRect(150, 100, 100, 80)  # 建筑主体
-        painter.drawPolygon([(150, 100), (200, 50), (250, 100)])  # 屋顶
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, "北航图寻\n测试图片\n500×375")
         
         painter.end()
-        
         self.image_label.setPixmap(pixmap)
-        self.image_label.setAlignment(Qt.AlignCenter)
+    
+    # ============ 游戏逻辑方法 ============
+    
+    def start_game(self):
+        """开始游戏"""
+        self.start_btn.setEnabled(False)
+        self.hint_btn.setEnabled(True)
+        self.next_btn.setEnabled(True)
+        self.end_btn.setEnabled(True)
         
-    def test_image_load(self):
-        """测试图片加载功能"""
-        print("\n=== 测试图片加载 ===")
+        # 加载第一张实际图片
+        self.load_actual_images_or_create_test()
         
-        # 检查当前pixmap状态
-        if self.image_label.pixmap():
-            print(f"当前图片尺寸: {self.image_label.pixmap().size()}")
-        else:
-            print("当前没有图片")
-            
-        # 重新加载图片
-        self.load_location_image("test", 0)
+        self.status_label.setText("游戏开始！请在地图上选择位置")
+        self.location_label.setText("当前地点：天空之境")
+        self.score_label.setText("得分: 0")
+        self.progress_bar.setValue(1)
         
-    def on_guess(self):
-        """处理猜测按钮点击"""
-        print("猜测按钮被点击")
-        
+        print("🎮 游戏开始")
+    
     def on_map_click(self, x: int, y: int):
-        """处理地图点击事件"""
-        print(f"接收到地图坐标: x={x}, y={y}")
-        self.info_label.setText(f"已选择坐标: ({x}, {y})")
+        """地图点击事件"""
+        if not self.start_btn.isEnabled():  # 游戏进行中
+            self.coord_label.setText(f"坐标: ({x}, {y})")
+            
+            # 模拟猜测结果
+            distance = ((x - 2500)**2 + (y - 1500)**2)**0.5
+            score = max(0, 100 - int(distance / 10))
+            
+            result_text = f"""
+            🎯 猜测结果：
+            坐标: ({x}, {y})
+            距离目标: {int(distance)} 像素
+            本轮得分: {score}
+            累计得分: {score}
+            """
+            
+            self.status_label.setText(result_text)
+            self.score_label.setText(f"得分: {score}")
+            
+            if distance < 200:
+                self.status_label.setStyleSheet("""
+                    QLabel {
+                        padding: 10px;
+                        background-color: #d4edda;
+                        border: 2px solid #c3e6cb;
+                        border-radius: 8px;
+                        color: #155724;
+                    }
+                """)
+            else:
+                self.status_label.setStyleSheet("""
+                    QLabel {
+                        padding: 10px;
+                        background-color: #f8d7da;
+                        border: 2px solid #f5c6cb;
+                        border-radius: 8px;
+                        color: #721c24;
+                    }
+                """)
+    
+    def get_hint(self):
+        """获取提示"""
+        self.hint_label.setText("💡 提示：这是一个现代建筑，玻璃幕墙设计")
+    
+    def next_round(self):
+        """下一轮"""
+        current_value = self.progress_bar.value()
+        if current_value < self.progress_bar.maximum():
+            self.progress_bar.setValue(current_value + 1)
+            self.location_label.setText(f"当前地点：末秋午后 (第{current_value + 1}轮)")
+            self.hint_label.setText("提示：")
+            self.status_label.setText("请在地图上选择位置")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    padding: 10px;
+                    background-color: #f8f9fa;
+                    border: 2px solid #dee2e6;
+                    border-radius: 8px;
+                    color: #495057;
+                }
+            """)
+    
+    def end_game(self):
+        """结束游戏"""
+        final_score = 150  # 模拟分数
+        result_text = f"""
+        🎮 游戏结束！
+        最终得分: {final_score}
+        感谢游玩！
+        """
         
-    def showEvent(self, event):
-        """窗口显示事件"""
-        super().showEvent(event)
+        self.status_label.setText(result_text)
+        self.status_label.setStyleSheet("""
+            QLabel {
+                padding: 10px;
+                background-color: #cce7ff;
+                border: 2px solid #99ceff;
+                border-radius: 8px;
+                color: #004085;
+            }
+        """)
         
-        # 窗口显示后检查图片状态
-        print("\n=== 窗口显示状态检查 ===")
-        print(f"图片标签尺寸: {self.image_label.size()}")
-        print(f"图片标签是否可见: {self.image_label.isVisible()}")
-        
-        if self.image_label.pixmap():
-            print(f"图片尺寸: {self.image_label.pixmap().size()}")
-        else:
-            print("警告: 图片标签没有pixmap")
+        self.start_btn.setEnabled(True)
+        self.hint_btn.setEnabled(False)
+        self.next_btn.setEnabled(False)
+        self.end_btn.setEnabled(False)
+    
+    def show_error(self, title: str, message: str):
+        """显示错误对话框"""
+        QMessageBox.critical(self, title, message)
+
+# 运行应用程序
+if __name__ == '__main__':
+    from PyQt5.QtWidgets import QApplication
+    import sys
+    
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    
+    window = MainWindow()
+    window.show()
+    
+    sys.exit(app.exec_())

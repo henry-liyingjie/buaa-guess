@@ -199,3 +199,33 @@ class MapLabel(QLabel):
         self.scale_factor = 1.0
         self.offset = QPoint(0, 0)
         self.update_display()
+    def create_test_map(self):
+        """创建测试地图"""
+        from PyQt5.QtGui import QPixmap, QPainter, QColor
+    
+        pixmap = QPixmap(800, 600)
+        pixmap.fill(QColor(200, 230, 255))  # 浅蓝色背景
+
+        painter = QPainter(pixmap)
+
+        # 绘制简单地图
+        painter.setPen(QColor(0, 100, 0))
+        painter.setBrush(QColor(100, 200, 100))
+        painter.drawRect(100, 100, 600, 400)  # 校园区域
+
+        # 绘制建筑
+        buildings = [
+            (200, 200, 100, 80, "主楼"),
+            (400, 300, 80, 60, "图书馆"), 
+            (500, 150, 60, 90, "体育馆")
+        ]
+
+        for x, y, w, h, name in buildings:
+            painter.setBrush(QColor(200, 200, 255))
+            painter.drawRect(x, y, w, h)
+            painter.drawText(x, y - 5, name)
+
+        painter.end()
+        self.original_pixmap = pixmap
+        self.scaled_pixmap = pixmap
+        self.update()
