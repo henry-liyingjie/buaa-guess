@@ -18,7 +18,7 @@ class MainWindow(QMainWindow):
     
     def initUI(self):
         """初始化界面"""
-        self.setWindowTitle('北航图寻 v1.0')
+        self.setWindowTitle('航寻 v1.0')
         self.setGeometry(100, 100, 1400, 800)
         
         # 中央部件
@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(15)
         
         # 1. 标题
-        title = QLabel("北航图寻")
+        title = QLabel("航寻")
         title.setFont(QFont("Microsoft YaHei", 24, QFont.Bold))
         title.setStyleSheet("color: #003366; padding: 10px;")
         title.setAlignment(Qt.AlignCenter)
