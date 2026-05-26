@@ -1,6 +1,8 @@
+#src/ui/map_controller.py
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtGui import QPixmap, QWheelEvent, QMouseEvent, QPainter
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+import os
 
 class MapLabel(QLabel):
     """修正版：精确的以光标为中心的缩放地图控件"""
@@ -20,7 +22,27 @@ class MapLabel(QLabel):
         self.setAlignment(Qt.AlignCenter)
         self.setStyleSheet("border: 2px solid blue; background-color: #f0f0f0;")
         self.setMouseTracking(True)
-    
+        self.marker_icon = None
+        self.load_marker_icon()  # 新增：加载图标
+    def load_marker_icon(self):
+        """加载并调整图标大小"""
+        icon_path = "data/images/marker_icon.png"
+        if os.path.exists(icon_path):
+            original_icon = QPixmap(icon_path)
+            if not original_icon.isNull():
+                # 调整图标大小为合适尺寸（例如 32x32 像素）
+                target_size = 32
+                self.marker_icon = original_icon.scaled(
+                    target_size, target_size, 
+                    Qt.KeepAspectRatio, 
+                    Qt.SmoothTransformation
+                )
+                print(f"✅ 图标加载成功，调整为 {target_size}x{target_size} 像素")
+            else:
+                self.marker_icon = None
+        else:
+            print(f"❌ 图标文件不存在: {icon_path}")
+            self.marker_icon = None
     def load_map(self, map_path):
         """加载地图图片"""
         pixmap = QPixmap(map_path)
@@ -163,37 +185,71 @@ class MapLabel(QLabel):
         """更新地图显示"""
         if not self.original_pixmap:
             return
-        
+
         # 计算缩放后的尺寸
         original_size = self.original_pixmap.size()
         scaled_width = int(original_size.width() * self.scale_factor)
         scaled_height = int(original_size.height() * self.scale_factor)
-        
+
         # 缩放图片
         scaled_pixmap = self.original_pixmap.scaled(
             scaled_width, scaled_height,
             Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
-        
+
         # 创建画布
         canvas = QPixmap(self.size())
         canvas.fill(Qt.white)
-        
+
         # 绘制图片（考虑偏移）
         painter = QPainter(canvas)
         x_offset = (self.width() - scaled_pixmap.width()) // 2 + self.offset.x()
         y_offset = (self.height() - scaled_pixmap.height()) // 2 + self.offset.y()
         painter.drawPixmap(x_offset, y_offset, scaled_pixmap)
+
+        # 新增：绘制图标标记
+        self.draw_marker(painter, x_offset, y_offset, scaled_width, scaled_height)
+
         painter.end()
-        
+
         self.setPixmap(canvas)
-    
+    def draw_marker(self, painter, x_offset, y_offset, scaled_width, scaled_height):
+        """绘制图标标记"""
+        if not hasattr(self, 'last_marker_pos') or not self.last_marker_pos:
+            return
+
+        if not self.marker_icon or self.marker_icon.isNull():
+            return
+
+        # 将原始坐标转换为屏幕坐标
+        marker_x, marker_y = self.last_marker_pos
+
+        # 计算标记在缩放后图片中的位置
+        screen_x = x_offset + marker_x * self.scale_factor
+        screen_y = y_offset + marker_y * self.scale_factor
+
+        # 绘制图标：底部中点对准目标位置
+        icon_width = self.marker_icon.width()
+        icon_height = self.marker_icon.height()
+        draw_x = screen_x - icon_width // 2
+        draw_y = screen_y - icon_height
+
+        painter.drawPixmap(int(draw_x), int(draw_y), self.marker_icon)
+
     def emit_map_coordinates(self, click_pos):
         """发射地图点击坐标"""
         original_pos = self.screen_to_original(click_pos)
         if original_pos:
+            # 新增：保存最后一个标记位置
+            self.last_marker_pos = (original_pos.x(), original_pos.y())
             self.mapClicked.emit(original_pos.x(), original_pos.y())
-    
+            self.update_display()  # 触发重绘显示图标
+    def clear_markers(self):
+        """清除所有标记"""
+        if hasattr(self, 'last_marker_pos'):
+            self.last_marker_pos = None
+        self.update_display()
+
     def reset_view(self):
         """重置视图"""
         self.scale_factor = 1.0
