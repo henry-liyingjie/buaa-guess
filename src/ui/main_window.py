@@ -27,10 +27,29 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.image_label)
 
         # 右侧：地图交互区（暂用标签代替）
+        # 右侧：地图交互区
         self.map_label = QLabel()
         self.map_label.setFixedSize(300, 500)
-        self.map_label.setText("地图区域\n（点击功能待实现）")
         self.map_label.setStyleSheet("border: 2px solid blue;")
+
+        # 尝试加载地图图片
+        map_path = "data/map.png"  # 或 "data/map.jpg"，根据你的实际文件
+        try:
+            map_pixmap = QPixmap(map_path)
+            if map_pixmap.isNull():
+                print(f"错误：无法加载地图图片 '{map_path}'，请检查文件是否存在且路径正确")
+                self.map_label.setText(f"地图加载失败\n文件：{map_path}")
+            else:
+                # 缩放图片以适应标签大小，保持比例
+                scaled_pixmap = map_pixmap.scaled(self.map_label.size(), 
+                                                 Qt.KeepAspectRatio, 
+                                                 Qt.SmoothTransformation)
+                self.map_label.setPixmap(scaled_pixmap)
+                print(f"地图图片 '{map_path}' 加载成功，尺寸：{map_pixmap.size()}")
+        except Exception as e:
+            print(f"加载地图时发生异常：{e}")
+            self.map_label.setText(f"地图加载异常：{str(e)}")
+
         layout.addWidget(self.map_label)
 
         # 底部：控制按钮
