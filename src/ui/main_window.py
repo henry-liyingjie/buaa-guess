@@ -14,8 +14,15 @@ from .map_controller import MapLabel
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.initUI()
-    
+        
+        # 图片轮换相关状态变量
+        self.game_started = False
+        self.current_round = 0
+        self.total_rounds = 3
+        self.game_images = ["天空之境.jpg", "末秋午后.jpg", "湖上旅者.jpg"]
+        self.current_image_index = 0
+        
+        self.initUI()        
     def initUI(self):
         """初始化界面"""
         self.setWindowTitle('航寻 v1.0')
@@ -302,19 +309,25 @@ class MainWindow(QMainWindow):
     
     def start_game(self):
         """开始游戏"""
+        self.game_started = True
+        self.current_round = 0
+        self.current_image_index = 0
+
+        # 禁用开始按钮，启用其他按钮
         self.start_btn.setEnabled(False)
         self.hint_btn.setEnabled(True)
         self.next_btn.setEnabled(True)
         self.end_btn.setEnabled(True)
-        
-        # 加载第一张实际图片
-        self.load_actual_images_or_create_test()
-        
-        self.status_label.setText("游戏开始！请在地图上选择位置")
-        self.location_label.setText("当前地点：天空之境")
-        self.score_label.setText("得分: 0")
-        self.progress_bar.setValue(1)
-        
+
+        # 加载第一张图片
+        self.load_current_game_image()
+
+        # 更新界面状态
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(self.total_rounds)
+        self.status_label.setText("🎮 游戏开始！请在地图上选择位置")
+        self.location_label.setText(f"当前图片: {self.game_images[self.current_image_index]}")
+
         print("🎮 游戏开始")
     
     def on_map_click(self, x: int, y: int):
@@ -360,55 +373,107 @@ class MainWindow(QMainWindow):
     
     def get_hint(self):
         """获取提示"""
-        self.hint_label.setText("💡 提示：这是一个现代建筑，玻璃幕墙设计")
-    
+        if not self.game_started:
+            return
+
+        image_name = self.game_images[self.current_image_index]
+        hint_map = {
+            "天空之境.jpg": "💡 这是一个现代建筑，玻璃幕墙设计",
+            "末秋午后.jpg": "💡 秋季景观，落叶满地，阳光温暖", 
+            "湖上旅者.jpg": "💡 湖边景观，有步行道，水面平静"
+        }
+
+        hint = hint_map.get(image_name, "💡 仔细观察图片特征")
+        self.hint_label.setText(hint)
+
     def next_round(self):
-        """下一轮"""
-        current_value = self.progress_bar.value()
-        if current_value < self.progress_bar.maximum():
-            self.progress_bar.setValue(current_value + 1)
-            self.location_label.setText(f"当前地点：末秋午后 (第{current_value + 1}轮)")
-            self.hint_label.setText("提示：")
-            self.status_label.setText("请在地图上选择位置")
-            self.status_label.setStyleSheet("""
-                QLabel {
-                    padding: 10px;
-                    background-color: #f8f9fa;
-                    border: 2px solid #dee2e6;
-                    border-radius: 8px;
-                    color: #495057;
-                }
-            """)
-    
+        """下一轮 - 切换图片"""
+        if not self.game_started:
+            return
+
+        # 检查是否已经完成所有轮次
+        if self.current_round >= self.total_rounds - 1:
+            self.end_game()
+            return
+
+        # 切换到下一张图片
+        self.current_round += 1
+        self.current_image_index = (self.current_image_index + 1) % len(self.game_images)
+
+        # 加载新图片
+        self.load_current_game_image()
+
+        # 更新界面
+        self.progress_bar.setValue(self.current_round)
+        self.location_label.setText(f"当前图片: {self.game_images[self.current_image_index]}")
+        self.status_label.setText(f"第 {self.current_round + 1} 轮: 请在地图上选择位置")
+        self.hint_label.setText("提示：点击'获取提示'查看信息")
+
+        print(f"🔄 切换到第 {self.current_round + 1} 轮: {self.game_images[self.current_image_index]}")
+
     def end_game(self):
         """结束游戏"""
-        final_score = 150  # 模拟分数
+        self.game_started = False
+
         result_text = f"""
         🎮 游戏结束！
-        最终得分: {final_score}
-        感谢游玩！
+        • 完成轮数: {self.current_round + 1}/{self.total_rounds}
+        • 感谢游玩！点击'开始游戏'重新开始
         """
-        
+
         self.status_label.setText(result_text)
-        self.status_label.setStyleSheet("""
-            QLabel {
-                padding: 10px;
-                background-color: #cce7ff;
-                border: 2px solid #99ceff;
-                border-radius: 8px;
-                color: #004085;
-            }
-        """)
-        
+
+        # 重置按钮状态
         self.start_btn.setEnabled(True)
         self.hint_btn.setEnabled(False)
         self.next_btn.setEnabled(False)
         self.end_btn.setEnabled(False)
+
+        print("🎮 游戏结束")
+
     
     def show_error(self, title: str, message: str):
         """显示错误对话框"""
         QMessageBox.critical(self, title, message)
+    def load_current_game_image(self):
+        """加载当前游戏图片"""
+        if not self.game_started or not self.game_images:
+            return
 
+        image_name = self.game_images[self.current_image_index]
+        image_path = os.path.join("data", "images", image_name)
+
+        if os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            if not pixmap.isNull():
+                # 缩放图片以适应标签
+                scaled_pixmap = pixmap.scaled(
+                    self.image_label.size(), 
+                    Qt.KeepAspectRatio, 
+                    Qt.SmoothTransformation
+                )
+                self.image_label.setPixmap(scaled_pixmap)
+                print(f"✅ 加载图片: {image_name}")
+                return
+
+        # 如果图片加载失败，显示占位图
+        print(f"❌ 图片加载失败: {image_path}")
+        self.create_placeholder_image(image_name)
+
+    def create_placeholder_image(self, image_name):
+        """创建占位图片"""
+        pixmap = QPixmap(500, 375)
+        pixmap.fill(QColor(240, 248, 255))
+
+        painter = QPainter(pixmap)
+        painter.setPen(QColor(100, 100, 100))
+        painter.drawRect(0, 0, 499, 374)
+
+        painter.setFont(QFont("Microsoft YaHei", 16))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, f"{image_name}\n\n图片加载中...")
+        painter.end()
+
+        self.image_label.setPixmap(pixmap)
 # 运行应用程序
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
