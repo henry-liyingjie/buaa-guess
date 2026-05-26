@@ -154,9 +154,9 @@ class MainWindow(QMainWindow):
         self.hint_btn.clicked.connect(self.get_hint)
         self.hint_btn.setEnabled(True)
         
-        self.next_btn = QPushButton("下一轮")
-        self.next_btn.setFont(QFont("Microsoft YaHei", 11))
-        self.next_btn.setStyleSheet("""
+        self.confirm_btn = QPushButton("确认位置")  # 原来是 self.next_btn = QPushButton("下一轮")
+        self.confirm_btn.setFont(QFont("Microsoft YaHei", 11))
+        self.confirm_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
                 color: white;
@@ -166,8 +166,8 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #0056b3; }
             QPushButton:disabled { background-color: #6c757d; }
         """)
-        self.next_btn.clicked.connect(self.next_round)
-        self.next_btn.setEnabled(False)
+        self.confirm_btn.clicked.connect(self.confirm_selection)  # 原来是 .clicked.connect(self.next_round)
+        self.confirm_btn.setEnabled(False)
         
         self.end_btn = QPushButton("结束游戏")
         self.end_btn.setFont(QFont("Microsoft YaHei", 11))
@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
         
         button_layout.addWidget(self.start_btn)
         button_layout.addWidget(self.hint_btn)
-        button_layout.addWidget(self.next_btn)
+        button_layout.addWidget(self.confirm_btn)
         button_layout.addWidget(self.end_btn)
         
         left_layout.addLayout(button_layout)
@@ -376,15 +376,23 @@ class MainWindow(QMainWindow):
 
 
     def on_map_click(self, x, y):
-        """地图点击事件 - 提交选择"""
+        """地图点击事件 - 支持多次点击调整"""
         if not self.game_started:
             return
-
+    
         print(f"📍 选择位置: ({x}, {y})")
         self.current_selection = (x, y)
+    
+        # 启用确认按钮
+        self.confirm_btn.setEnabled(True)
+    
+     # 更新状态提示
+        self.status_label.setText(f"已选择位置 ({x}, {y})，点击'确认位置'提交")
 
-        # 立即提交本轮
-        self.submit_round()
+        # 在地图上显示标记
+        if hasattr(self.map_label, 'last_marker_pos'):
+            self.map_label.last_marker_pos = (x, y)
+            self.map_label.update_display()
     def get_hint(self):
         """获取提示"""
         if not self.game_started:
@@ -485,8 +493,29 @@ class MainWindow(QMainWindow):
         # 重置游戏状态
         self.game_started = False
         self.status_label.setText("游戏已结束，点击'开始游戏'重新开始")
+    def confirm_selection(self):
+        """确认当前选择并结算本轮"""
+        if not self.current_selection:
+            return
+    
+        print(f"✅ 确认提交: {self.current_selection}")
+    
+        # 禁用确认按钮，防止重复提交
+        self.confirm_btn.setEnabled(False)
 
-
+        # 调用原有的结算逻辑
+        self.submit_round()
+    def prepare_next_action(self):
+        """准备下一步动作"""
+        # 如果是最后一轮，显示游戏结束
+        if self.current_round >= self.total_rounds:
+            self.show_inline_game_summary()
+            # 重置游戏状态
+            self.game_started = False
+        else:
+            # 不自动进入下一轮，等待用户操作
+            # 可以在这里添加一个"下一轮"按钮或者保持当前状态
+            self.status_label.setText("本轮结算完成")
     def prepare_next_round(self):
         """准备下一轮"""
         # 清除地图标记
