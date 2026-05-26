@@ -169,25 +169,25 @@ class MainWindow(QMainWindow):
         self.confirm_btn.clicked.connect(self.confirm_selection)  # 原来是 .clicked.connect(self.next_round)
         self.confirm_btn.setEnabled(False)
         
-        self.end_btn = QPushButton("结束游戏")
-        self.end_btn.setFont(QFont("Microsoft YaHei", 11))
-        self.end_btn.setStyleSheet("""
+        self.next_round_btn = QPushButton("下一轮")  # 手动进入下一轮
+        self.next_round_btn.setFont(QFont("Microsoft YaHei", 11))
+        self.next_round_btn.setStyleSheet("""
             QPushButton {
-                background-color: #dc3545;
+                background-color: #007bff;
                 color: white;
-                padding: 10px 20px;
+                padding:10px 20px;
                 border-radius: 6px;
             }
-            QPushButton:hover { background-color: #c82333; }
+            QPushButton:hover { background-color: #0056b3; }
             QPushButton:disabled { background-color: #6c757d; }
         """)
-        self.end_btn.clicked.connect(self.end_game)
-        self.end_btn.setEnabled(False)
+        self.next_round_btn.clicked.connect(self.manual_next_round)
+        self.next_round_btn.setEnabled(False)
         
         button_layout.addWidget(self.start_btn)
         button_layout.addWidget(self.hint_btn)
         button_layout.addWidget(self.confirm_btn)
-        button_layout.addWidget(self.end_btn)
+        button_layout.addWidget(self.next_round_btn)
         
         left_layout.addLayout(button_layout)
         left_layout.addStretch()
@@ -198,7 +198,30 @@ class MainWindow(QMainWindow):
         self.total_score_label.setStyleSheet("color: #ff6b35; padding: 10px;")
         left_layout.addWidget(self.total_score_label)
         
-    
+        self.result_info_label = QLabel("")
+        self.result_info_label.setFont(QFont("Microsoft YaHei", 11))
+        self.result_info_label.setAlignment(Qt.AlignCenter)
+        self.result_info_label.setStyleSheet("""
+            padding: 12px;
+            background-color: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-top: 10px;
+        """)
+
+        # 添加到现有布局中（根据您的布局顺序）
+        left_layout.addWidget(self.result_info_label)
+
+        # 总分显示区域（新添加）
+        self.total_score_label = QLabel("总分: 0")
+        self.total_score_label.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
+        self.total_score_label.setAlignment(Qt.AlignCenter)
+        self.total_score_label.setStyleSheet("""
+            color: #ff6b35;
+            padding: 10px;
+        """)
+
+        left_layout.addWidget(self.total_score_label)
 
 
         
@@ -358,8 +381,11 @@ class MainWindow(QMainWindow):
     
     def start_game(self):
         """开始游戏"""
-        # 清除结算区域，恢复提示
-        self.hint_label.setText("提示：仔细观察图片特征，在地图上找到对应位置")
+        # 初始化结算区域
+        if hasattr(self, 'result_info_label'):
+            self.result_info_label.setText("")
+        if hasattr(self, 'total_score_label'):
+            self.total_score_label.setText("总分: 0")
 
         self.game_started = True
         self.current_round = 0
@@ -367,12 +393,19 @@ class MainWindow(QMainWindow):
         self.round_scores = []
         self.current_selection = None
 
-        # 更新界面
-        self.total_score_label.setText("总分: 0")
+        # 设置按钮状态
+        if hasattr(self, 'confirm_btn'):
+            self.confirm_btn.setEnabled(False)
+        if hasattr(self, 'next_round_btn'):
+            self.next_round_btn.setEnabled(False)
+
+        # 更新状态
         self.status_label.setText("游戏开始！请在地图上选择位置")
 
         # 开始第一轮
         self.next_round()
+
+
 
 
     def on_map_click(self, x, y):
@@ -386,13 +419,17 @@ class MainWindow(QMainWindow):
         # 启用确认按钮
         self.confirm_btn.setEnabled(True)
     
-     # 更新状态提示
-        self.status_label.setText(f"已选择位置 ({x}, {y})，点击'确认位置'提交")
-
+        # 禁用下一轮按钮（如果之前启用）
+        self.next_round_btn.setEnabled(False)
+    
+        # 更新状态提示
+        self.status_label.setText(f"已选择位置 ({x}, {y})，点击'确认结算'提交")
+    
         # 在地图上显示标记
         if hasattr(self.map_label, 'last_marker_pos'):
             self.map_label.last_marker_pos = (x, y)
             self.map_label.update_display()
+
     def get_hint(self):
         """获取提示"""
         if not self.game_started:
@@ -411,11 +448,11 @@ class MainWindow(QMainWindow):
         self.hint_label.setText(hint)
 
     def submit_round(self):
-        """提交本轮选择并在原页面显示结算"""
+        """提交本轮结算"""
         if not self.current_selection:
             return
 
-        # 计算得分（基于距离的简单算法）
+        # 计算得分
         current_image = self.game_images[self.current_image_index]
         target_pos = self.correct_positions.get(current_image, (2500, 1500))
         user_pos = self.current_selection
@@ -430,11 +467,20 @@ class MainWindow(QMainWindow):
         self.total_score += round_score
         self.round_scores.append(round_score)
 
-        # 在原页面显示结算信息
-        self.show_inline_result(round_score, target_pos, distance)
+        # 在地图上显示标记（如果支持）
+        if hasattr(self.map_label, 'set_markers'):
+            self.map_label.set_markers(user_pos, target_pos)
+        elif hasattr(self.map_label, 'last_marker_pos'):
+            self.map_label.last_marker_pos = user_pos
+            self.map_label.update_display()
 
-        # 更新界面显示
-        self.update_after_round()
+        # 显示结算信息
+        self.show_result(round_score, target_pos, distance)
+
+        # 启用下一轮按钮
+        if hasattr(self, 'next_round_btn'):
+            self.next_round_btn.setEnabled(True)
+
 
     def show_inline_result(self, round_score, target_pos, distance):
         """在原页面显示结算信息"""
@@ -474,37 +520,53 @@ class MainWindow(QMainWindow):
             # 准备下一轮
             self.prepare_next_round()
 
-    def show_inline_game_summary(self):
-        """在原页面显示游戏总结"""
-        summary = f"""
-        🎮 游戏结束！
-
-        最终得分: {self.total_score} 分
-
-        各轮得分:
+    def show_inline_result(self, round_score, target_pos, distance):
+        """在原页面显示结算信息"""
+        result_text = f"""
+        🎯 第 {self.current_round} 轮结算
+    
+        确认位置: ({self.current_selection[0]}, {self.current_selection[1]})
+        正确位置: ({target_pos[0]}, {target_pos[1]})
+        距离偏差: {int(distance)} 像素
+    
+        本轮得分: {round_score} 分
+        累计总分: {self.total_score} 分
+    
+        👉 点击"下一轮"按钮继续
         """
+    
+        self.result_info_label.setText(result_text)
+        self.total_score_label.setText(f"总分: {self.total_score}")
+        self.status_label.setText(f"第 {self.current_round} 轮结算完成，点击'下一轮'继续")
 
-        for i, score in enumerate(self.round_scores, 1):
-            summary += f"\n第 {i} 轮: {score} 分"
-
-        # 使用提示区域显示游戏总结
-        self.hint_label.setText(summary)
-
-        # 重置游戏状态
-        self.game_started = False
-        self.status_label.setText("游戏已结束，点击'开始游戏'重新开始")
     def confirm_selection(self):
         """确认当前选择并结算本轮"""
         if not self.current_selection:
             return
     
-        print(f"✅ 确认提交: {self.current_selection}")
+        print(f"✅ 确认结算: {self.current_selection}")
     
-        # 禁用确认按钮，防止重复提交
+        # 禁用确认按钮，防止重复结算
         self.confirm_btn.setEnabled(False)
 
-        # 调用原有的结算逻辑
+        # 启用下一轮按钮
+        self.next_round_btn.setEnabled(True)
+
+        # 调用结算逻辑
         self.submit_round()
+    def manual_next_round(self):
+        """手动进入下一轮"""
+        print("🔄 手动进入下一轮")
+    
+        # 禁用下一轮按钮
+        self.next_round_btn.setEnabled(False)
+    
+        # 如果游戏未结束，进入下一轮
+        if self.game_started and self.current_round < self.total_rounds:
+            self.next_round()
+        else:
+            self.show_game_summary()
+
     def prepare_next_action(self):
         """准备下一步动作"""
         # 如果是最后一轮，显示游戏结束
@@ -558,44 +620,76 @@ class MainWindow(QMainWindow):
         """进入下一轮"""
         if not self.game_started or self.current_round >= self.total_rounds:
             return
-
+    
         self.current_round += 1
         self.current_image_index = (self.current_image_index + 1) % len(self.game_images)
 
-        # 修复这里：使用正确的方法名
-        self.load_current_game_image()  # 原来是 self.load_current_image()
+        # 加载新图片
+        self.load_current_game_image()
 
-        # 清除地图标记
+        # 重置选择状态
+        self.current_selection = None
+
+        # 禁用两个按钮
+        self.confirm_btn.setEnabled(False)
+        self.next_round_btn.setEnabled(False)
+
+        # 清除地图标记和结算信息
         if hasattr(self.map_label, 'clear_markers'):
             self.map_label.clear_markers()
+
+        self.result_info_label.setText("")
 
         # 更新状态
         self.status_label.setText(f"第 {self.current_round} 轮: 请在地图上选择位置")
 
         print(f"🔄 第 {self.current_round}/{self.total_rounds} 轮")
 
-    
-    
-    
-    def end_game(self):
-        """结束游戏"""
-        self.game_started = False
+    def show_result(self, round_score, target_pos, distance):
+        """显示结算信息"""
+        if not hasattr(self, 'result_info_label') or not self.current_selection:
+            return
 
         result_text = f"""
-        🎮 游戏结束！
-        • 完成轮数: {self.current_round + 1}/{self.total_rounds}
-        • 感谢游玩！点击'开始游戏'重新开始
+        🎯 第 {self.current_round} 轮结算
+
+        您的选择: ({self.current_selection[0]}, {self.current_selection[1]})
+        正确答案: ({target_pos[0]}, {target_pos[1]})
+        距离偏差: {int(distance)} 像素
+
+        本轮得分: {round_score} 分
+        累计总分: {self.total_score} 分
+
+        👉 点击"下一轮"按钮继续
         """
 
-        self.status_label.setText(result_text)
+        self.result_info_label.setText(result_text)
+        self.total_score_label.setText(f"总分: {self.total_score}")
+        self.status_label.setText(f"第 {self.current_round} 轮结算完成")
 
-        # 重置按钮状态
-        self.start_btn.setEnabled(True)
-        self.hint_btn.setEnabled(False)
-        self.next_btn.setEnabled(False)
-        self.end_btn.setEnabled(False)
 
-        print("🎮 游戏结束")
+
+
+
+        def end_game(self):
+            """结束游戏"""
+            self.game_started = False
+
+            result_text = f"""
+            🎮 游戏结束！
+            • 完成轮数: {self.current_round + 1}/{self.total_rounds}
+            • 感谢游玩！点击'开始游戏'重新开始
+            """
+
+            self.status_label.setText(result_text)
+
+            # 重置按钮状态
+            self.start_btn.setEnabled(True)
+            self.hint_btn.setEnabled(False)
+            self.next_btn.setEnabled(False)
+            self.end_btn.setEnabled(False)
+
+            print("🎮 游戏结束")
 
     
     def show_error(self, title: str, message: str):
