@@ -16,50 +16,128 @@ class MainWindow(QMainWindow):
     def initUI(self):
         # 设置窗口标题和大小
         self.setWindowTitle('北航图寻')
-        self.setGeometry(100, 100, 1200, 700)
-        
+        self.setGeometry(100, 100, 1400, 800)  # 增大窗口
+
         # 中央窗口部件
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
-        # 主布局：左右分栏
+
+        # 主布局：左右分栏，设置比例
         layout = QHBoxLayout(central_widget)
-        
+        layout.setSpacing(20)  # 设置间距
+
         # ============ 左侧：游戏控制区 ============
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        
-        # 图片显示区域 - 只定义一次！
+        left_layout.setSpacing(15)
+
+        # 标题
+        title_label = QLabel("北航图寻")
+        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #003366;")
+        left_layout.addWidget(title_label)
+
+        # 图片显示区域 - 增大尺寸
         self.image_label = QLabel()
-        self.image_label.setFixedSize(400, 300)
-        self.image_label.setStyleSheet("border: 3px solid red; background-color: white;")
-        
+        self.image_label.setMinimumSize(500, 375)  # 增大：500×375 (4:3比例)
+        self.image_label.setMaximumSize(600, 450)  # 最大：600×450
+        self.image_label.setStyleSheet("""
+            QLabel {
+                border: 3px solid #ff6b6b;
+                background-color: white;
+                qproperty-alignment: AlignCenter;
+            }
+        """)
+
         # 加载地点图片
         self.load_location_image("main_building", 1)
-        
+
         left_layout.addWidget(self.image_label)
-        
-        # 信息显示
+
+        # 图片说明
+        self.image_desc = QLabel("当前目标地点")
+        self.image_desc.setStyleSheet("font-size: 14px; color: #666;")
+        left_layout.addWidget(self.image_desc)
+
+        # 信息显示区域
         self.info_label = QLabel("等待游戏开始...")
+        self.info_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                padding: 10px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 5px;
+            }
+        """)
+        self.info_label.setMinimumHeight(100)
         left_layout.addWidget(self.info_label)
-        
-        # 测试按钮
-        test_button = QPushButton("测试图片加载")
+
+        # 游戏控制按钮
+        button_layout = QHBoxLayout()
+
+        start_button = QPushButton("开始游戏")
+        start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                padding: 10px 20px;
+                font-size: 16px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+
+        test_button = QPushButton("测试图片")
+        test_button.setStyleSheet("""
+            QPushButton {
+                background-color: #17a2b8;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 5px;
+            }
+        """)
         test_button.clicked.connect(self.test_image_load)
-        left_layout.addWidget(test_button)
-        
-        # 猜测按钮
-        self.guess_button = QPushButton("确认猜测")
-        self.guess_button.clicked.connect(self.on_guess)
-        left_layout.addWidget(self.guess_button)
-        
+
+        reset_button = QPushButton("重置视图")
+        reset_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 5px;
+            }
+        """)
+        reset_button.clicked.connect(lambda: self.map_label.reset_view())
+
+        button_layout.addWidget(start_button)
+        button_layout.addWidget(test_button)
+        button_layout.addWidget(reset_button)
+
+        left_layout.addLayout(button_layout)
+
+        # 得分显示
+        self.score_label = QLabel("得分: 0")
+        self.score_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #dc3545;")
+        left_layout.addWidget(self.score_label)
+
         left_layout.addStretch()
-        
+
         # ============ 右侧：地图交互区 ============
-        # 使用MapLabel（支持缩放）
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+
+        # 地图标题
+        map_title = QLabel("北航校园地图")
+        map_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #003366;")
+        right_layout.addWidget(map_title)
+
+        # 地图控件 - 增大但保持比例
         self.map_label = MapLabel()
-        self.map_label.setFixedSize(600, 500)
-        
+        self.map_label.setMinimumSize(700, 525)  # 700×525 (与左侧保持比例)
+
         # 加载地图
         map_path = "data/map.png"
         if os.path.exists(map_path):
@@ -68,12 +146,25 @@ class MainWindow(QMainWindow):
         else:
             print(f"地图文件不存在: {map_path}")
             self.map_label.setText(f"地图文件不存在\n{map_path}")
-        
-        # ============ 添加到主布局 ============
-        layout.addWidget(left_panel)
-        layout.addWidget(self.map_label)
-        
-        print("✅ 界面初始化完成")
+
+        # 地图使用说明
+        map_instructions = QLabel("使用说明：\n• 鼠标滚轮缩放\n• 左键拖拽移动\n• 右键点击选择位置")
+        map_instructions.setStyleSheet("color: #666; font-size: 14px;")
+    
+        right_layout.addWidget(self.map_label)
+        right_layout.addWidget(map_instructions)
+        right_layout.addStretch()
+
+        # ============ 设置布局比例 ============
+        # 左侧:右侧 ≈ 5:7 (更平衡的比例)
+        layout.addWidget(left_panel, stretch=5)   # 左侧占5份
+        layout.addWidget(right_panel, stretch=7)  # 右侧占7份
+
+        # 连接信号
+        self.map_label.mapClicked.connect(self.on_map_click)
+
+        print("✅ 界面初始化完成（优化布局）")
+
         
     def load_location_image(self, location_name, image_index=0):
         """加载指定地点的图片"""
