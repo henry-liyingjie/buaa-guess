@@ -11,6 +11,7 @@ from PyQt5.QtGui import QColor, QPainter  # 确保有这个导入
 
 # 导入地图控件
 from .map_controller import MapLabel
+from random import randint
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -19,14 +20,17 @@ class MainWindow(QMainWindow):
         # 图片轮换相关状态变量
         self.game_started = False
         self.current_round = 0
-        self.total_rounds = 3
+        self.total_rounds = 5
         self.correct_positions = {
-            "天空之境.jpg": (2800, 1600),
-            "末秋午后.jpg": (2200, 1200), 
-            "湖上旅者.jpg": (1900, 1800)
+            "天空之境.jpg": (2012, 1982),
+            "末秋午后.jpg": (3174, 1523), 
+            "湖上旅者.jpg": (1987, 2157),
+            "图书馆.jpg": (2265, 1698), 
+            "TD.jpg": (3154, 1833),
         }
-        self.game_images = ["天空之境.jpg", "末秋午后.jpg", "湖上旅者.jpg"]
-        self.current_image_index = 0
+        self.game_images = ["天空之境.jpg", "末秋午后.jpg", "湖上旅者.jpg","图书馆.jpg","TD.jpg"]
+        self.current_image_index = randint(0,4)
+        self.step_size=randint(1,4)
         
         self.initUI()        
     def initUI(self):
@@ -109,7 +113,7 @@ class MainWindow(QMainWindow):
         
         # 6. 游戏进度
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 10)
+        self.progress_bar.setRange(0, 3)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFormat("第 %v/%m 轮")
@@ -334,7 +338,9 @@ class MainWindow(QMainWindow):
         actual_images = [
             "data/images/天空之境.jpg",
             "data/images/末秋午后.jpg", 
-            "data/images/湖上行者.jpg"
+            "data/images/湖上行者.jpg",
+            "data/images/图书馆.jpg", 
+            "data/images/TD.jpg"
         ]
         
         for image_path in actual_images:
@@ -433,7 +439,9 @@ class MainWindow(QMainWindow):
         hint_map = {
             "天空之境.jpg": "💡 这是一个现代建筑，玻璃幕墙设计",
             "末秋午后.jpg": "💡 秋季景观，落叶满地，阳光温暖", 
-            "湖上旅者.jpg": "💡 湖边景观，有步行道，水面平静"
+            "湖上旅者.jpg": "💡 湖边景观，有步行道，水面平静",
+            "图书馆.jpg": "💡 一个用来学习的地方", 
+            "TD.jpg": "💡 我要举报......"
         }
 
         hint = hint_map.get(image_name, "💡 仔细观察图片特征")
@@ -454,8 +462,8 @@ class MainWindow(QMainWindow):
         # 计算欧几里得距离
         distance = ((user_pos[0] - target_pos[0])**2 + (user_pos[1] - target_pos[1])**2)**0.5
 
-        # 距离越近得分越高（最大100分）
-        round_score = max(0, 100 - int(distance / 10))
+        # 距离越近得分越高（最大5000分）
+        round_score = max(0, 5000 - int(distance * 5))
 
         # 更新总分
         self.total_score += round_score
@@ -622,7 +630,7 @@ class MainWindow(QMainWindow):
             return
     
         self.current_round += 1
-        self.current_image_index = (self.current_image_index + 1) % len(self.game_images)
+        self.current_image_index = (self.current_image_index + self.step_size) % len(self.game_images)
 
         # 加载新图片
         self.load_current_game_image()
