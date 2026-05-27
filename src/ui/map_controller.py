@@ -22,27 +22,54 @@ class MapLabel(QLabel):
         self.setAlignment(Qt.AlignCenter)
         self.setStyleSheet("border: 2px solid blue; background-color: #f0f0f0;")
         self.setMouseTracking(True)
+
+        # 加载两种图标
         self.marker_icon = None
-        self.load_marker_icon()  # 新增：加载图标
-    def load_marker_icon(self):
-        """加载并调整图标大小"""
-        icon_path = "data/images/marker_icon.png"
-        if os.path.exists(icon_path):
-            original_icon = QPixmap(icon_path)
+        self.correct_icon = None
+        self.load_icons()  # 修改：合并加载方法
+    
+        # 标记位置存储
+        self.last_marker_pos = None    # 玩家标记位置
+        self.last_correct_pos = None   # 新增：正确答案位置
+
+    def load_icons(self):
+        """加载并调整两种图标大小"""
+        target_size = 32  # 统一的目标尺寸
+        
+        # 加载 marker_icon
+        marker_path = "data/images/marker_icon.png"  # 原路径保持不变
+        if os.path.exists(marker_path):
+            original_icon = QPixmap(marker_path)
             if not original_icon.isNull():
-                # 调整图标大小为合适尺寸（例如 32x32 像素）
-                target_size = 32
                 self.marker_icon = original_icon.scaled(
-                    target_size, target_size, 
-                    Qt.KeepAspectRatio, 
+                    target_size, target_size,
+                    Qt.KeepAspectRatio,
                     Qt.SmoothTransformation
                 )
-                print(f"✅ 图标加载成功，调整为 {target_size}x{target_size} 像素")
+                print(f"✅ marker_icon 加载成功，调整为 {target_size}x{target_size} 像素")
             else:
                 self.marker_icon = None
         else:
-            print(f"❌ 图标文件不存在: {icon_path}")
+            print(f"❌ marker_icon 文件不存在: {marker_path}")
             self.marker_icon = None
+        
+        # 新增：加载 correct_icon
+        correct_path = "data/images/correct_icon.png"  # 新图标路径
+        if os.path.exists(correct_path):
+            original_correct = QPixmap(correct_path)
+            if not original_correct.isNull():
+                self.correct_icon = original_correct.scaled(
+                    target_size, target_size,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+                print(f"✅ correct_icon 加载成功，调整为 {target_size}x{target_size} 像素")
+            else:
+                self.correct_icon = None
+        else:
+            print(f"❌ correct_icon 文件不存在: {correct_path}")
+            self.correct_icon = None
+    
     def load_map(self, map_path):
         """加载地图图片"""
         pixmap = QPixmap(map_path)
@@ -151,6 +178,19 @@ class MapLabel(QLabel):
         
         return QPoint(int(screen_x), int(screen_y))
     
+    def set_correct_position(self, x, y):
+        """设置正确答案的位置"""
+        self.last_correct_pos = (x, y)
+        self.update_display()  # 立即更新显示
+
+    def clear_markers(self):
+        """清除所有标记（对称处理）"""
+        # 清除玩家标记
+        self.last_marker_pos = None
+        # 新增：清除正确答案标记
+        self.last_correct_pos = None
+        self.update_display()
+        
     def mousePressEvent(self, event: QMouseEvent):
         """鼠标按下事件"""
         if event.button() == Qt.LeftButton:
@@ -207,34 +247,41 @@ class MapLabel(QLabel):
         y_offset = (self.height() - scaled_pixmap.height()) // 2 + self.offset.y()
         painter.drawPixmap(x_offset, y_offset, scaled_pixmap)
 
-        # 新增：绘制图标标记
-        self.draw_marker(painter, x_offset, y_offset, scaled_width, scaled_height)
+        # 修改：绘制所有标记（包括正确答案标记）
+        self.draw_markers(painter, x_offset, y_offset, scaled_width, scaled_height)
 
         painter.end()
-
         self.setPixmap(canvas)
-    def draw_marker(self, painter, x_offset, y_offset, scaled_width, scaled_height):
-        """绘制图标标记"""
-        if not hasattr(self, 'last_marker_pos') or not self.last_marker_pos:
-            return
 
-        if not self.marker_icon or self.marker_icon.isNull():
-            return
 
-        # 将原始坐标转换为屏幕坐标
-        marker_x, marker_y = self.last_marker_pos
+    def draw_markers(self, painter, x_offset, y_offset, scaled_width, scaled_height):
+        """绘制所有标记（玩家标记和正确答案标记）"""
+        # 绘制玩家标记 (marker_icon)
+        if self.last_marker_pos and self.marker_icon and not self.marker_icon.isNull():
+            marker_x, marker_y = self.last_marker_pos
+            screen_x = x_offset + marker_x * self.scale_factor
+            screen_y = y_offset + marker_y * self.scale_factor
+            
+            icon_width = self.marker_icon.width()
+            icon_height = self.marker_icon.height()
+            draw_x = screen_x - icon_width // 2
+            draw_y = screen_y - icon_height
+            
+            painter.drawPixmap(int(draw_x), int(draw_y), self.marker_icon)
+        
+        # 新增：绘制正确答案标记 (correct_icon)
+        if self.last_correct_pos and self.correct_icon and not self.correct_icon.isNull():
+            correct_x, correct_y = self.last_correct_pos
+            screen_x = x_offset + correct_x * self.scale_factor
+            screen_y = y_offset + correct_y * self.scale_factor
+            
+            icon_width = self.correct_icon.width()
+            icon_height = self.correct_icon.height()
+            draw_x = screen_x - icon_width // 2
+            draw_y = screen_y - icon_height
+            
+            painter.drawPixmap(int(draw_x), int(draw_y), self.correct_icon)
 
-        # 计算标记在缩放后图片中的位置
-        screen_x = x_offset + marker_x * self.scale_factor
-        screen_y = y_offset + marker_y * self.scale_factor
-
-        # 绘制图标：底部中点对准目标位置
-        icon_width = self.marker_icon.width()
-        icon_height = self.marker_icon.height()
-        draw_x = screen_x - icon_width // 2
-        draw_y = screen_y - icon_height
-
-        painter.drawPixmap(int(draw_x), int(draw_y), self.marker_icon)
 
     def emit_map_coordinates(self, click_pos):
         """发射地图点击坐标"""
@@ -244,11 +291,6 @@ class MapLabel(QLabel):
             self.last_marker_pos = (original_pos.x(), original_pos.y())
             self.mapClicked.emit(original_pos.x(), original_pos.y())
             self.update_display()  # 触发重绘显示图标
-    def clear_markers(self):
-        """清除所有标记"""
-        if hasattr(self, 'last_marker_pos'):
-            self.last_marker_pos = None
-        self.update_display()
 
     def reset_view(self):
         """重置视图"""

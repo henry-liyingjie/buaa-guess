@@ -191,12 +191,6 @@ class MainWindow(QMainWindow):
         
         left_layout.addLayout(button_layout)
         left_layout.addStretch()
-        # 总分显示 - 添加这个关键元素
-        self.total_score_label = QLabel("总分: 0")
-        self.total_score_label.setFont(QFont("Microsoft YaHei", 16, QFont.Bold))
-        self.total_score_label.setAlignment(Qt.AlignCenter)
-        self.total_score_label.setStyleSheet("color: #ff6b35; padding: 10px;")
-        left_layout.addWidget(self.total_score_label)
         
         self.result_info_label = QLabel("")
         self.result_info_label.setFont(QFont("Microsoft YaHei", 11))
@@ -467,13 +461,19 @@ class MainWindow(QMainWindow):
         self.total_score += round_score
         self.round_scores.append(round_score)
 
-        # 在地图上显示标记（如果支持）
+        # 在地图上显示标记
         if hasattr(self.map_label, 'set_markers'):
             self.map_label.set_markers(user_pos, target_pos)
         elif hasattr(self.map_label, 'last_marker_pos'):
             self.map_label.last_marker_pos = user_pos
             self.map_label.update_display()
 
+        # 修复：直接使用 target_pos 而不是 self.game
+        actual_x, actual_y = target_pos  # 直接从字典获取坐标
+        
+        # 在地图控件上设置正确答案位置
+        self.map_label.set_correct_position(actual_x, actual_y)
+        
         # 显示结算信息
         self.show_result(round_score, target_pos, distance)
 
@@ -671,25 +671,25 @@ class MainWindow(QMainWindow):
 
 
 
-        def end_game(self):
-            """结束游戏"""
-            self.game_started = False
+    def end_game(self):
+        """结束游戏"""
+        self.game_started = False
 
-            result_text = f"""
-            🎮 游戏结束！
-            • 完成轮数: {self.current_round + 1}/{self.total_rounds}
-            • 感谢游玩！点击'开始游戏'重新开始
-            """
+        result_text = f"""
+        🎮 游戏结束！
+        • 完成轮数: {self.current_round + 1}/{self.total_rounds}
+        • 感谢游玩！点击'开始游戏'重新开始
+        """
 
-            self.status_label.setText(result_text)
+        self.status_label.setText(result_text)
 
-            # 重置按钮状态
-            self.start_btn.setEnabled(True)
-            self.hint_btn.setEnabled(False)
-            self.next_btn.setEnabled(False)
-            self.end_btn.setEnabled(False)
+        # 重置按钮状态
+        self.start_btn.setEnabled(True)
+        self.hint_btn.setEnabled(False)
+        self.next_btn.setEnabled(False)
+        self.end_btn.setEnabled(False)
 
-            print("🎮 游戏结束")
+        print("🎮 游戏结束")
 
     
     def show_error(self, title: str, message: str):
