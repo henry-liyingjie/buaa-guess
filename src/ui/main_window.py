@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
         
         # 6. 游戏进度
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 3)
+        self.progress_bar.setRange(0, 5)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFormat("第 %v/%m 轮")
@@ -393,6 +393,9 @@ class MainWindow(QMainWindow):
         self.round_scores = []
         self.current_selection = None
 
+        # 修复：重置进度条
+        self.progress_bar.setValue(0)
+
         # 设置按钮状态
         if hasattr(self, 'confirm_btn'):
             self.confirm_btn.setEnabled(False)
@@ -630,8 +633,8 @@ class MainWindow(QMainWindow):
             return
     
         self.current_round += 1
+        self.progress_bar.setValue(self.current_round)
         self.current_image_index = (self.current_image_index + self.step_size) % len(self.game_images)
-
         # 加载新图片
         self.load_current_game_image()
 
