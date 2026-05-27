@@ -12,6 +12,7 @@ from PyQt5.QtGui import QColor, QPainter  # 确保有这个导入
 # 导入地图控件
 from .map_controller import MapLabel
 from random import randint
+import csv
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -21,15 +22,15 @@ class MainWindow(QMainWindow):
         self.game_started = False
         self.current_round = 0
         self.total_rounds = 5
-        self.correct_positions = {
-            "天空之境.jpg": (2012, 1982),
-            "末秋午后.jpg": (3174, 1523), 
-            "湖上旅者.jpg": (1987, 2157),
-            "图书馆.jpg": (2265, 1698), 
-            "TD.jpg": (3154, 1833),
-        }
-        self.game_images = ["天空之境.jpg", "末秋午后.jpg", "湖上旅者.jpg","图书馆.jpg","TD.jpg"]
-        self.current_image_index = randint(0,4)
+        self.correct_positions = {}
+        self.game_images = []
+        with open("data/locations.csv", "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                self.correct_positions[row["filename"]] = (int(row["correct_x"]), int(row["correct_y"]))
+                self.game_images.append(row["filename"])
+        self.total_rounds = 5
+        self.current_image_index = randint(0, len(self.game_images)-1)
         self.step_size=randint(1,4)
         
         self.initUI()        
@@ -333,16 +334,14 @@ class MainWindow(QMainWindow):
         painter.end()
 
         self.image_label.setPixmap(pixmap)
+
     def load_actual_images_or_create_test(self):
         """尝试加载实际图片，否则创建测试图片"""
-        actual_images = [
-            "data/images/天空之境.jpg",
-            "data/images/末秋午后.jpg", 
-            "data/images/湖上行者.jpg",
-            "data/images/图书馆.jpg", 
-            "data/images/TD.jpg"
-        ]
-        
+        actual_images = []
+        with open("data/locations.csv", "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                actual_images.append(f"data/images/{row['filename']}")
         for image_path in actual_images:
             if os.path.exists(image_path):
                 pixmap = QPixmap(image_path)
@@ -439,14 +438,11 @@ class MainWindow(QMainWindow):
             return
 
         image_name = self.game_images[self.current_image_index]
-        hint_map = {
-            "天空之境.jpg": "💡 这是一个现代建筑，玻璃幕墙设计",
-            "末秋午后.jpg": "💡 秋季景观，落叶满地，阳光温暖", 
-            "湖上旅者.jpg": "💡 湖边景观，有步行道，水面平静",
-            "图书馆.jpg": "💡 一个用来学习的地方", 
-            "TD.jpg": "💡 我要举报......"
-        }
-
+        hint_map = {}
+        with open("data/locations.csv", "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                hint_map[row["filename"]] = row["hint"]
         hint = hint_map.get(image_name, "💡 仔细观察图片特征")
 
         # 在提示区域显示提示
